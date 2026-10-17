@@ -1,5 +1,5 @@
 /* 五里头子奇 PWA 离线缓存 */
-var CACHE = 'gomoku-v3';
+var CACHE = 'gomoku-v4';
 var ASSETS = [
   './',
   './index.html',
