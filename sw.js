@@ -1,5 +1,5 @@
 /* 技能五子棋 PWA 离线缓存 */
-var CACHE = 'gomoku-v1';
+var CACHE = 'gomoku-v2';
 var ASSETS = [
   './',
   './index.html',
@@ -26,6 +26,21 @@ self.addEventListener('activate', function(e){
 
 self.addEventListener('fetch', function(e){
   if (e.request.method !== 'GET') return;
+  if (e.request.mode === 'navigate'){
+    /* 页面导航：优先联网取最新版，离线再回退缓存 */
+    e.respondWith(
+      fetch(e.request).then(function(res){
+        if (res && res.status === 200){
+          var clone = res.clone();
+          caches.open(CACHE).then(function(c){ c.put('./index.html', clone); });
+        }
+        return res;
+      }).catch(function(){
+        return caches.match('./index.html');
+      })
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(function(hit){
       if (hit) return hit;
