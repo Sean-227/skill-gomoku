@@ -1,5 +1,5 @@
-/* 技能五子棋 PWA 离线缓存 */
-var CACHE = 'gomoku-v2';
+/* 五里头子奇 PWA 离线缓存 */
+var CACHE = 'gomoku-v3';
 var ASSETS = [
   './',
   './index.html',
