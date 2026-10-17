@@ -86,6 +86,21 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
 #boardOverlay p{color:#f3e6c8;margin:0;font-size:15px;}
 .again{background:var(--orange);color:#fff;border:2px solid #fff;border-radius:12px;padding:11px 24px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;transition:.15s;box-shadow:0 6px 16px rgba(255,77,28,.4);}
 .again:hover{background:#ff6a2e;}
+#diceOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:20px;z-index:2;
+  background:rgba(74,46,16,.62);backdrop-filter:blur(3px);}
+#diceOverlay.show{display:flex;}
+.dice-box{background:#fffdf2;border:3px solid #fff;border-radius:18px;padding:20px 22px;max-width:300px;width:100%;
+  box-shadow:0 12px 36px rgba(0,0,0,.35);text-align:center;}
+.dice-box h2{margin:0;font-family:"ZCOOL KuaiLe","Yuanti SC","YouYuan","幼圆",sans-serif;font-weight:800;font-size:22px;color:var(--ink);letter-spacing:1px;}
+.dice-row{display:flex;align-items:center;justify-content:center;gap:14px;margin:16px 0 16px;}
+.dice-side p{margin:8px 0 0;font-size:14px;font-weight:800;color:var(--ink);}
+.dvs{font-family:"ZCOOL KuaiLe","Yuanti SC","YouYuan","幼圆",sans-serif;font-weight:900;font-size:20px;color:var(--orange);}
+.die{width:76px;height:76px;border-radius:14px;background:#fff;
+  box-shadow:inset 0 0 0 3px #2f6bff,0 6px 14px rgba(47,107,255,.35);
+  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:10px;gap:5px;}
+.die .p{background:var(--orange);border-radius:50%;width:100%;height:100%;}
+.dmsg{min-height:18px;margin:10px 0 0;font-size:14px;font-weight:800;color:var(--orange);}
+#diceOverlay .again{margin-top:4px;}
 
 .panel{display:flex;flex-direction:column;gap:16px;}
 .card{background:#fffdf2;border:2px solid rgba(120,80,20,.22);border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(120,80,20,.14);}
@@ -158,13 +173,25 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
       </div>
       <div id="boardWrap">
         <canvas id="board"></canvas>
+        <div id="diceOverlay">
+          <div class="dice-box">
+            <h2>投骰子 · 定先后</h2>
+            <div class="dice-row">
+              <div class="dice-side"><div class="die" id="dieMe"></div><p>你</p></div>
+              <span class="dvs">VS</span>
+              <div class="dice-side"><div class="die" id="dieAi"></div><p>电脑</p></div>
+            </div>
+            <button class="again" id="btnRoll">投骰子</button>
+            <p class="dmsg" id="diceMsg"></p>
+          </div>
+        </div>
         <div id="boardOverlay">
           <h2 id="ovTitle">你赢了</h2>
           <p id="ovSub">漂亮的一局</p>
           <button class="again" id="btnAgain">再来一局</button>
         </div>
       </div>
-      <p class="status" id="status">对局开始，轮到你落子。</p>
+      <p class="status" id="status">投骰子决定谁先走。</p>
     </section>
 
     <aside class="panel">
@@ -243,17 +270,54 @@ var hoverR=-1,hoverC=-1;
 var visionCells=[], hintCells=[], winCells=[];
 var actx=null;
 
+var DICE_DOTS={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+function dieFace(n){
+  var dots=DICE_DOTS[n]||[], s='', i;
+  for(i=0;i<9;i++) s += (dots.indexOf(i)>=0)?'<span class="p"></span>':'<span></span>';
+  return s;
+}
+function showDice(){
+  state.diceDone=false;
+  document.getElementById('dieMe').innerHTML=dieFace(6);
+  document.getElementById('dieAi').innerHTML=dieFace(6);
+  document.getElementById('diceMsg').textContent='';
+  document.getElementById('btnRoll').disabled=false;
+  document.getElementById('diceOverlay').classList.add('show');
+  document.getElementById('boardOverlay').classList.remove('show');
+  setStatus('投骰子，点数大的一方先走');
+  renderUI(); draw();
+}
+function rollDice(){
+  if(state.diceDone)return;
+  var me=1+Math.floor(Math.random()*6), ai=1+Math.floor(Math.random()*6);
+  document.getElementById('dieMe').innerHTML=dieFace(me);
+  document.getElementById('dieAi').innerHTML=dieFace(ai);
+  if(me===ai){ document.getElementById('diceMsg').textContent='平局（'+me+' 对 '+ai+'），再投一次'; return; }
+  state.diceDone=true;
+  document.getElementById('btnRoll').disabled=true;
+  var playerWon=me>ai;
+  document.getElementById('diceMsg').textContent= playerWon
+    ? ('你掷出 '+me+'，电脑掷出 '+ai+'，你先走！')
+    : ('电脑掷出 '+ai+'，你掷出 '+me+'，电脑先走！');
+  playSound();
+  setTimeout(function(){
+    document.getElementById('diceOverlay').classList.remove('show');
+    if(playerWon){ state.turn='player'; setStatus('你先走（执黑）'); renderUI(); draw(); }
+    else { startAi(); }
+  }, 900);
+}
 function init(){
   state={
     board:Array.from({length:N},function(){return new Array(N).fill(0);}),
     turn:'player', playerEnergy:4, aiEnergy:5,
     phase:'normal', gameOver:false,
-    aiFrozen:false, aiChaos:false, aiLastMove:null, pickAI:null, multiLeft:0
+    aiFrozen:false, aiChaos:false, aiLastMove:null, pickAI:null, multiLeft:0, diceDone:false
   };
   visionCells=[]; hintCells=[]; winCells=[];
   hoverR=-1;hoverC=-1;
   document.getElementById('boardOverlay').classList.remove('show');
   renderUI(); draw();
+  showDice();
 }
 
 function inB(r,c){return r>=0&&r<N&&c>=0&&c<N;}
@@ -304,6 +368,7 @@ function endGame(winner){
 /* ---------- 玩家操作 ---------- */
 function onCell(r,c){
   if(state.gameOver)return;
+  if(!state.diceDone)return;
   if(state.phase==='remove'){ /* 飞沙走石：扔电脑棋子 */
     if(state.board[r][c]===2){
       state.board[r][c]=0; state.phase='normal'; clearHighlights(); playSound();
@@ -547,7 +612,8 @@ function renderUI(){
   document.getElementById('enMe').textContent=me;
   document.getElementById('enAi').textContent=ai;
   var tag=document.getElementById('turnTag');
-  if(state.gameOver){tag.textContent='已结束';tag.style.opacity=.6;}
+  if(!state.diceDone){tag.textContent='掷骰定先后';tag.style.opacity=.7;}
+  else if(state.gameOver){tag.textContent='已结束';tag.style.opacity=.6;}
   else if(state.turn==='player'){tag.textContent='轮到你';tag.style.opacity=1;}
   else{tag.textContent='电脑思考';tag.style.opacity=.7;}
   var busy=state.phase!=='normal';
@@ -672,6 +738,7 @@ document.querySelectorAll('.skill').forEach(function(b){
 });
 document.getElementById('btnNew').addEventListener('click',init);
 document.getElementById('btnAgain').addEventListener('click',init);
+document.getElementById('btnRoll').addEventListener('click',rollDice);
 window.addEventListener('resize',fitCanvas);
 
 var toastTimer=null;
