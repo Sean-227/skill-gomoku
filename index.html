@@ -54,6 +54,23 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
 }
 .newgame:hover{background:#ff6a2e;transform:translateY(-1px);}
 .newgame svg{width:16px;height:16px;}
+.actions{flex:none;display:flex;gap:8px;}
+.installbtn{flex:none;display:flex;align-items:center;gap:6px;background:#2f6bff;border:2px solid #fff;
+  color:#fff;border-radius:12px;padding:10px 13px;font-size:15px;font-weight:800;cursor:pointer;
+  transition:.18s;font-family:inherit;box-shadow:0 6px 16px rgba(47,107,255,.4);}
+.installbtn:hover{background:#4a7dff;transform:translateY(-1px);}
+.installbtn svg{width:16px;height:16px;}
+#installOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;z-index:20;
+  background:rgba(74,46,16,.62);backdrop-filter:blur(3px);}
+#installOverlay.show{display:flex;}
+.install-box{background:#fffdf2;border:3px solid #fff;border-radius:18px;padding:22px;max-width:340px;width:100%;
+  box-shadow:0 12px 36px rgba(0,0,0,.35);text-align:center;}
+.install-box h2{margin:0 0 6px;font-family:"ZCOOL KuaiLe","Yuanti SC","YouYuan","幼圆",sans-serif;font-weight:800;font-size:22px;color:var(--ink);letter-spacing:1px;}
+.install-box .iwhere{font-size:14px;font-weight:800;color:var(--ink);margin:0 0 12px;}
+.install-box ol{margin:0 0 14px;padding:0;list-style:none;text-align:left;}
+.install-box li{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:2px dashed rgba(120,80,20,.2);font-size:15px;font-weight:800;color:var(--ink);}
+.install-box li .n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;}
+#installOverlay .again{margin-top:2px;}
 
 .layout{display:grid;gap:18px;}
 .board-zone{background:#fffdf2;border:2px solid rgba(120,80,20,.25);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(120,80,20,.16);}
@@ -159,10 +176,16 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
       <h1 class="title">五里<b>头子奇</b></h1>
       <div class="sub">会耍赖的才是真高手 · SHOWTIME</div>
     </div>
-    <button class="newgame" id="btnNew">
-      <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      重开一局
-    </button>
+    <div class="actions">
+      <button class="installbtn" id="btnInstall">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10m0 0l-4-4m4 4l4-4M5 19h14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        装桌面
+      </button>
+      <button class="newgame" id="btnNew">
+        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        重开一局
+      </button>
+    </div>
   </header>
 
   <div class="layout">
@@ -182,6 +205,14 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
       <div id="boardWrap">
         <canvas id="board"></canvas>
         <div id="speechBubble"></div>
+        <div id="installOverlay">
+          <div class="install-box">
+            <h2>把游戏加到桌面</h2>
+            <p class="iwhere" id="installWhere">跟着下面几步操作：</p>
+            <ol id="installSteps"></ol>
+            <button class="again" id="btnInstallClose">知道了</button>
+          </div>
+        </div>
         <div id="diceOverlay">
           <div class="dice-box">
             <h2>投骰子 · 定先后</h2>
@@ -793,6 +824,41 @@ document.querySelectorAll('.skill').forEach(function(b){
 document.getElementById('btnNew').addEventListener('click',init);
 document.getElementById('btnAgain').addEventListener('click',init);
 document.getElementById('btnRoll').addEventListener('click',rollDice);
+document.getElementById('btnInstallClose').addEventListener('click',function(){
+  document.getElementById('installOverlay').classList.remove('show');
+});
+var deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredPrompt=e;});
+function isInstalled(){
+  return (window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)
+    || navigator.standalone===true;
+}
+function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;}
+document.getElementById('btnInstall').addEventListener('click',function(){
+  var ov=document.getElementById('installOverlay'), steps=document.getElementById('installSteps'),
+      where=document.getElementById('installWhere');
+  if(isInstalled()){where.textContent='游戏已经装好了，去桌面找「五里头子奇」图标吧！';steps.innerHTML='';}
+  else if(deferredPrompt){
+    var p=deferredPrompt; deferredPrompt=null;
+    p.prompt();
+    p.userChoice.then(function(){});
+  }else{
+    steps.innerHTML='';
+    function li(n,t){var d=document.createElement('li');d.innerHTML='<span class="n">'+n+'</span><span>'+t+'</span>';steps.appendChild(d);}
+    if(isIOS()){
+      where.textContent='iPhone / iPad：用 Safari 打开，照着点：';
+      li(1,'点底部中间的「分享」按钮（方框+箭头）');
+      li(2,'往下滑，选「添加到主屏幕」');
+      li(3,'点右上角「添加」，桌面就有图标了');
+    }else{
+      where.textContent='安卓：用 Chrome 打开，照着点：';
+      li(1,'点右上角菜单 ⋮');
+      li(2,'选「安装应用 / 添加到主屏幕」');
+      li(3,'桌面上出现图标，独立全屏玩');
+    }
+  }
+  ov.classList.add('show');
+});
 window.addEventListener('resize',fitCanvas);
 
 var toastTimer=null;
