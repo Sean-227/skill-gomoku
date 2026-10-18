@@ -101,6 +101,14 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
 .die .p{background:var(--orange);border-radius:50%;width:100%;height:100%;}
 .dmsg{min-height:18px;margin:10px 0 0;font-size:14px;font-weight:800;color:var(--orange);}
 #diceOverlay .again{margin-top:4px;}
+#speechBubble{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:6;max-width:88%;min-width:60%;
+  background:#fffdf2;border:3px solid var(--orange);border-radius:16px;padding:9px 14px;font-size:15px;font-weight:800;
+  color:var(--ink);font-family:"ZCOOL KuaiLe","Yuanti SC","YouYuan","幼圆",sans-serif;box-shadow:0 8px 22px rgba(0,0,0,.3);
+  text-align:center;pointer-events:none;opacity:0;transition:opacity .18s;}
+#speechBubble.show{opacity:1;}
+#speechBubble b{color:var(--orange);}
+#speechBubble::after{content:'';position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);
+  border:8px solid transparent;border-top-color:var(--orange);}
 
 .panel{display:flex;flex-direction:column;gap:16px;}
 .card{background:#fffdf2;border:2px solid rgba(120,80,20,.22);border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(120,80,20,.14);}
@@ -173,6 +181,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
       </div>
       <div id="boardWrap">
         <canvas id="board"></canvas>
+        <div id="speechBubble"></div>
         <div id="diceOverlay">
           <div class="dice-box">
             <h2>投骰子 · 定先后</h2>
@@ -524,11 +533,13 @@ function aiTurn(){
         if(s==='remove'){
           state.board[t.r][t.c]=0; state.aiEnergy-=4;
           toast('电脑施展「飞沙走石」，扔了你的关键子');
+          shout('电脑',SKILL_LINES.ai_remove[0],SKILL_LINES.ai_remove[1]);
         }else{
           var dest=aiRelocateDest();
           if(dest){
             state.board[t.r][t.c]=0; state.board[dest.r][dest.c]=1; state.aiEnergy-=5;
             toast('电脑施展「调呈离山」，把你的棋子调走了');
+            shout('电脑',SKILL_LINES.ai_move[0],SKILL_LINES.ai_move[1]);
           }
         }
       }
@@ -552,6 +563,7 @@ function aiTurn(){
   if(place())return;
   if(usedDouble && !state.gameOver){
     toast('电脑施展「静如止水」，冻结时间连下两子');
+    shout('电脑',SKILL_LINES.ai_freeze[0],SKILL_LINES.ai_freeze[1]);
     if(place())return;
   }
   state.turn='player'; state.phase='normal';
@@ -564,6 +576,41 @@ function startAi(){
 }
 
 /* ---------- 技能 ---------- */
+var SKILL_LINES={
+  sand:['飞沙走石——走你！把电脑这颗破子儿扔进什刹海！','这就扔出去了？问得好！师傅掷子如掷剑！'],
+  freeze:['静——如——止——水！冻住！电脑你这一回合，凉了！','速冻完成，物理降温，舒服！'],
+  rewind:['时光——倒流！爷青回！这子儿就当没下过！','反悔也是一种本事，问得好！'],
+  chaos:['两极反转——！放你黑历史！电脑你下一手闭眼走！','哈哈哈哈，这段儿没法播！'],
+  move:['调呈离山！嘿咻——白子儿起开！这片地儿我承包了！','搬家是吧？走得还挺利索！'],
+  smash:['力——拔——山——兮！气盖世！这一盘，我掀了！','赢了赢了！师傅我直接封神，不用谢！'],
+  crossbow:['诸葛连弩——哒哒哒哒！三箭齐发！','就问这波操作亮不亮眼？亮！'],
+  ai_remove:['嘿嘿，你这子儿我扔了！这招叫——技高一筹！','徒弟，学着点儿！'],
+  ai_move:['挪走挪走！此乃调呈离山，你子儿搬家啦！','这片地儿归我喽！'],
+  ai_freeze:['冻住你！师傅连下两子，开不开心？','就问快不快？快！']
+};
+function speak(text){
+  try{
+    if(!('speechSynthesis' in window))return;
+    window.speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    u.lang='zh-CN';u.pitch=1.5;u.rate=1.28;u.volume=1;
+    var vs=window.speechSynthesis.getVoices(),i;
+    for(i=0;i<vs.length;i++){if(/zh|Chinese/i.test(vs[i].lang+vs[i].name)){u.voice=vs[i];break;}}
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+function shout(who,line,line2){
+  var b=document.getElementById('speechBubble');if(!b)return;
+  function show(t){b.innerHTML=(who==='你'?'<b>你</b>：':'<b>电脑</b>：')+t;b.classList.add('show');}
+  clearTimeout(shout._h);clearTimeout(shout._h2);
+  show(line);speak(line);
+  if(line2){
+    shout._h2=setTimeout(function(){show(line2);speak(line2);},2100);
+    shout._h=setTimeout(function(){b.classList.remove('show');},4600);
+  }else{
+    shout._h=setTimeout(function(){b.classList.remove('show');},2500);
+  }
+}
 function clearHighlights(){visionCells=[];hintCells=[];}
 function activateSkill(k){
   if(state.gameOver||state.turn!=='player'){toast('现在不能使用技能');return;}
@@ -574,14 +621,17 @@ function activateSkill(k){
   if(k==='sand'){
     state.phase='remove';
     setStatus('飞沙走石：点击电脑（白）的棋子，扔进什刹海');
+    shout('你',SKILL_LINES.sand[0],SKILL_LINES.sand[1]);
   }else if(k==='freeze'){
     state.aiFrozen=true;
     setStatus('静如止水：电脑被速冻，你再落一子');
+    shout('你',SKILL_LINES.freeze[0],SKILL_LINES.freeze[1]);
   }else if(k==='rewind'){
     if(state.aiLastMove&&state.board[state.aiLastMove[0]][state.aiLastMove[1]]===2){
       state.board[state.aiLastMove[0]][state.aiLastMove[1]]=0;
       state.aiLastMove=null;
       setStatus('时光倒流：电脑刚落的棋子已消失');
+      shout('你',SKILL_LINES.rewind[0],SKILL_LINES.rewind[1]);
     }else{
       state.playerEnergy+=s.cost;
       toast('电脑还没落子，无法倒流（能量已返还）');
@@ -589,15 +639,19 @@ function activateSkill(k){
   }else if(k==='chaos'){
     state.aiChaos=true;
     setStatus('两极反转：放出黑历史，电脑下一手将乱走');
+    shout('你',SKILL_LINES.chaos[0],SKILL_LINES.chaos[1]);
   }else if(k==='move'){
     state.phase='pickAI';
     setStatus('调呈离山：先点电脑（白）的一颗棋子');
+    shout('你',SKILL_LINES.move[0],SKILL_LINES.move[1]);
   }else if(k==='smash'){
     endGame('player');
     setStatus('力拔山兮：掀翻棋盘，直接获胜！');
+    shout('你',SKILL_LINES.smash[0],SKILL_LINES.smash[1]);
   }else if(k==='crossbow'){
     state.phase='multi'; state.multiLeft=3;
     setStatus('诸葛连弩：请连落三子');
+    shout('你',SKILL_LINES.crossbow[0],SKILL_LINES.crossbow[1]);
   }
   renderUI();draw();
 }
